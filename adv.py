@@ -104,12 +104,15 @@ graph = {}
 rooms_left = len(room_graph) - len(visited_rooms)
 prev_direction = None
 prev_room = None
+rooms_path = []
 
 while rooms_left > 0:
 
     
     # say where the player is
     print(f"the player is in room {player.current_room.id}")
+    if player.current_room.id not in rooms_path:
+        rooms_path.append(player.current_room.id)
     # get the next available exits
     exits = player.current_room.get_exits()
     print(f"Available exits {exits}")
@@ -128,17 +131,40 @@ while rooms_left > 0:
             updated = True
             print(f"The previous move was {prev_direction} which is invalid to the new direction \nchanging the new direction to {new_direction}")
         
-
     
     # generate graph    
     print(update_graph(graph, player, new_direction, prev_direction))
     
-    # if the player has been to a room do a BFS to find the next room to travel to
+    # if the player has been to a room do a search to find the next room to travel to
     if player.current_room.get_room_in_direction(new_direction) in visited_rooms:
         print(f"been to this room")
         found = False
+        copy_path = rooms_path.copy()
         while not found:
+            print(f"rooms path {copy_path}")
+            last = copy_path.pop()
+            search = graph[last]
+            room_number = last
+            if "?" in search.values():
+                print(search)
+                found = True
+        
+        for key, value in reversed(list(search.items())):
+            if value == "?":
+                new_direction = key
+                print(new_direction)
+                print(room_number)
+                break
             
+        for room in visited_rooms:
+            if room.id == room_number:
+                player.current_room = room
+         
+        print(f"new room {player.current_room.id}")
+        update_graph(graph, player, new_direction, prev_direction)
+            
+        
+
 
 
     # move the player
@@ -157,8 +183,8 @@ while rooms_left > 0:
 
     # update the rooms visited set, how many rooms are left, and the previous direction before the loop
     visited_rooms.add(player.current_room)
-    rooms_left = len(room_graph) - len(visited_rooms)
-    # rooms_left -= 1
+    #rooms_left = len(room_graph) - len(visited_rooms)
+    rooms_left -= 1
     prev_direction = new_direction
     
     print()
