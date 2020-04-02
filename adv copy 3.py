@@ -218,12 +218,13 @@ class Traverse:
             if self.all_rooms_searched() is False:
                 direction = self.reverse_direction(travelback.pop())
             traversal.append(direction)
-            #print(f"Traveling back direction {direction}")
+            print(f"Traveling back direction {direction}")
             # have the player travel there
             player.travel(direction)
             # get the room ID number
             roomID = player.current_room.id
-            #print(f"The player traveled back to {roomID}")
+
+            print(f"The player traveled back to {roomID}")
             # get the data for that room ID
             roomdata = self.graph[roomID]
             # update the class
@@ -232,11 +233,11 @@ class Traverse:
             for key,value in roomdata.items():
                 if value == "?":
                     print(f"The value from the subgraph {roomdata} is {key}")
-                    found = True
+                    return direction,traversal
                 
 
             print(f"length of the graph {len(self.graph)}")
-        return direction,traversal
+        
 
     def all_rooms_searched(self):
         if self.graph == self.master_graph:
@@ -283,40 +284,40 @@ roomsleft = len(room_graph) - len(visited_rooms)
 trvse = Traverse(master_graph, player)
 previous_move = None
 moving = None
-#travel = ['n','n','s','s','e','e']
+roomsleft = 250
 
-while True:
+while roomsleft > 0:
     print(f"The player is in room {player.current_room.id}")
     graph = trvse.update_graph(player=player, previous_move=previous_move)
-    #print(f"Graph {graph}")
+    print(f"Graph {graph}")
     if trvse.all_rooms_searched() is False:
         if trvse.is_deadend(current_room=player.current_room) is False:
             moving = trvse.get_direction(player=player)
             traversal_path.append(moving)
-            #print(f"The player is moving {moving}")
+            print(f"The player is moving {moving}")
             visited_rooms.add(player.current_room)
             trvse.nextroom(moving)
             #print(trvse)
             player.travel(moving)
-            #print(f"the player just moved to {player.current_room.id}")
+            print(f"the player just moved to {player.current_room.id}")
             previous_move = moving
             roomsleft = len(room_graph) - len(visited_rooms)
 
         elif trvse.is_deadend(current_room=player.current_room):
             #print(trvse)
-            #print(f"Room {player.current_room.id} is a deadend")
+            print(f"Room {player.current_room.id} is a deadend")
             previous_move, path = trvse.backtrack(player, traversal_path)
             traversal_path += path
             trvse.stack = Stack()
-            #print(f"Previous move is {previous_move}")
-            #print(f"The travel back path is {path}")
+            print(f"Previous move is {previous_move}")
+            print(f"The travel back path is {path}")
     else:
         break
     
     # print(f"Moving: {moving}")
     # print(f"Graph {graph}")
     print(len(traversal_path))
-    #roomsleft -= 1
+    roomsleft -= 1
     
     print()
     
@@ -326,8 +327,9 @@ print(graph)
 
 
 
-
+player.current_room = world.starting_room
 for move in traversal_path:
+    print(f"{player.current_room.id} moving {move}")
     player.travel(move)
     visited_rooms.add(player.current_room)
 
