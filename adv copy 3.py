@@ -1,7 +1,7 @@
 from room import Room
 from player import Player
 from world import World
-from util import Stack
+from util import Stack, Queue
 from random import choice, sample
 from ast import literal_eval
 
@@ -49,7 +49,7 @@ class Traverse:
         self.previous_move = previous_move 
         self.previous_room = player.current_room.get_room_in_direction(self.reverse_direction(previous_move)) if previous_move is not None else None
         
-    def update_graph(self,player = None,previous_move = None):
+    def update_graph(self,player = None,previous_move = None, backtrack=False):
         '''
         updates the graph
         '''
@@ -87,10 +87,11 @@ class Traverse:
             reverse = self.reverse_direction(previous)
             # get the room before the current room
             roombefore = self.player.current_room.get_room_in_direction(reverse)
-            # make the room before point to the current room
-            self.graph[roombefore.id][previous] = self.player.current_room.id
-            # make the current room point to the room before it
-            self.graph[self.player.current_room.id][reverse] = roombefore.id
+            if not backtrack:
+                # make the room before point to the current room
+                self.graph[roombefore.id][previous] = self.player.current_room.id
+                # make the current room point to the room before it
+                self.graph[self.player.current_room.id][reverse] = roombefore.id
         
         
 
@@ -103,16 +104,21 @@ class Traverse:
         else:
             raise ValueError(f"The direction {direction} is invalid")
 
-    def get_neighbors(self, current_room=None):
+    def get_neighbors(self, current_room=None, obj = False):
         # the room ID to look up in the master graph
         room_id = self.player.current_room.id if current_room is None else current_room.id
         # the data for that room
         subgraph = self.master_graph[room_id]
         #print(f"Graph data at room {room_id} {self.master_graph[room_id]}")
         neighbors = []
-        # loop through each key/value pair and append the room ID number
-        for key, value in subgraph.items():
-            neighbors.append(value)
+        if obj is False:
+            # loop through each key/value pair and append the room ID number
+            for key, value in subgraph.items():
+                neighbors.append(value)
+        else:
+            exits = current_room.get_exits()
+            for ext in exits:
+                neighbors.append(current_room.get_room_in_direction(ext))
 
         return neighbors
 
@@ -153,10 +159,10 @@ class Traverse:
         
         skip = False
         while not skip:
-            print(f"{self.stack.show()} the stack")
+            #print(f"{self.stack.show()} the stack")
             # pop from the stack and check if the room is not in visited
             roomID = self.stack.pop()
-            print(f"{roomID} was popped from the stack")
+            #print(f"{roomID} was popped from the stack")
             # get the graph data for the current room
             subdata = self.master_graph[self.player.current_room.id]
             # find the room that was popped from the stack and return the direction
@@ -238,6 +244,37 @@ class Traverse:
 
             print(f"length of the graph {len(self.graph)}")
         
+    def bfs(self, player, traversal_path):
+        """
+        Return a list containing the shortest path from
+        starting_vertex to destination_vertex in
+        breath-first order.
+        """
+        # create the queue
+        q = Queue()
+        # enqueue a path to current room
+        q.enqueue([player.current_room])
+        visited = set()
+
+        while q.size() > 0:
+            # get the first path
+            path = q.dequeue()
+            # grab room from the back
+            v = path[-1]
+            # check if its been visited
+            if v not in visited:
+                visited.add(v.id)
+                # find the room in the graph
+                data = self.graph[v.id]
+                # see if the room has unexplored paths
+                for value in data.values():
+                    if value == "?":
+                        return path
+                
+                for neighbor in self.get_neighbors(v,obj = True):
+                    path_copy = path.copy()
+                    path_copy.append(neighbor)
+                    q.enqueue(path_copy)
 
     def all_rooms_searched(self):
         if self.graph == self.master_graph:
@@ -246,6 +283,25 @@ class Traverse:
         else:
             return False
 
+    def decode(self, path):
+        """
+        decodes the travels back path made up by the bfs
+        """
+        travel = []
+        for count,room in enumerate(path):
+            #print(room.id)
+            # find the room in the graph
+            data = self.graph[room.id]
+            #print(data)
+            index = count + 1
+            if index != len(path):
+                for key, value in data.items():
+                    if value == path[index].id:
+                        #print(key)
+                        travel.append(key)
+
+        return travel
+        
 
 # Load world
 world = World()
@@ -256,8 +312,8 @@ world = World()
 #map_file = "maps/test_cross.txt"
 #map_file = "maps/test_loop.txt"
 
-map_file = "maps/test_loop_fork.txt"
-#map_file = "maps/main_maze.txt"
+#map_file = "maps/test_loop_fork.txt"
+map_file = "maps/main_maze.txt"
 
 # Loads the map into a dictionary
 room_graph=literal_eval(open(map_file, "r").read())
@@ -274,7 +330,7 @@ player.current_room = world.starting_room
 #visited_rooms.add(player.current_room)
 master_graph = {}
 graph = {}
-for key, value in room_graph.items():
+for key, value in sorted(room_graph.items()):
     print(f"Key: {key} value: {value[1]}")
     master_graph[key] = value[1]
 
@@ -284,33 +340,39 @@ roomsleft = len(room_graph) - len(visited_rooms)
 trvse = Traverse(master_graph, player)
 previous_move = None
 moving = None
-roomsleft = 250
+roomsleft = 15
+back = False
 
 while roomsleft > 0:
     print(f"The player is in room {player.current_room.id}")
-    graph = trvse.update_graph(player=player, previous_move=previous_move)
-    print(f"Graph {graph}")
+    graph = trvse.update_graph(player=player, previous_move=previous_move,backtrack=back )
+    #print(f"Graph {graph}")
     if trvse.all_rooms_searched() is False:
         if trvse.is_deadend(current_room=player.current_room) is False:
             moving = trvse.get_direction(player=player)
             traversal_path.append(moving)
-            print(f"The player is moving {moving}")
+            #print(f"The player is moving {moving}")
             visited_rooms.add(player.current_room)
             trvse.nextroom(moving)
             #print(trvse)
             player.travel(moving)
-            print(f"the player just moved to {player.current_room.id}")
+            #print(f"the player just moved to {player.current_room.id}")
             previous_move = moving
             roomsleft = len(room_graph) - len(visited_rooms)
+            back = False
 
         elif trvse.is_deadend(current_room=player.current_room):
             #print(trvse)
             print(f"Room {player.current_room.id} is a deadend")
-            previous_move, path = trvse.backtrack(player, traversal_path)
+            path = trvse.bfs(player, traversal_path)
+            path = trvse.decode(path)
             traversal_path += path
+            for move in path:
+                player.travel(move)
+            back = True
             trvse.stack = Stack()
             print(f"Previous move is {previous_move}")
-            print(f"The travel back path is {path}")
+            #print(f"The travel back path is {path}")
     else:
         break
     
@@ -323,13 +385,13 @@ while roomsleft > 0:
     
 
 
-print(graph)
+#print(graph)
 
 
 
 player.current_room = world.starting_room
 for move in traversal_path:
-    print(f"{player.current_room.id} moving {move}")
+    #print(f"{player.current_room.id} moving {move}")
     player.travel(move)
     visited_rooms.add(player.current_room)
 
